@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import Pokemons from "../page";
+import PokemonsCard from "@/app/components/PokemonsCard";
 
 async function getDetailsPokemon(slug) {
   const rest = await fetch(`https://pokeapi.co/api/v2/pokemon/${slug}`);
@@ -7,9 +8,35 @@ async function getDetailsPokemon(slug) {
   return data;
 }
 
+async function getEvolutionChain(speciesUrl) {
+  const speciesRes = await fetch(speciesUrl);
+  const speciesData = await speciesRes.json();
+  const evolutionRes = await fetch(speciesData.evolution_chain.url);
+  return evolutionRes.json();
+}
+
+function getEvolutionNames(chain, evolutions = []) {
+  evolutions.push(chain.species.name);
+  if (chain.evolves_to.length > 0) {
+    chain.evolves_to.forEach((evo) => getEvolutionNames(evo, evolutions));
+  }
+  return evolutions;
+}
+
 async function PokemonDescription({ params }) {
   const slug = params.slug;
   const pokemon = await getDetailsPokemon(slug);
+
+  const evolutionData = await getEvolutionChain(pokemon.species.url);
+  const evolutionNames = getEvolutionNames(evolutionData.chain);
+
+  const evolutionsWithSprites = await Promise.all(
+    evolutionNames.map(async (name) => {
+      const evoPokemon = await getDetailsPokemon(name);
+      return evoPokemon;
+    })
+  );
+
   return (
     <>
       <div className="w-9/12 mx-auto my-10 flex flex-col items-center">
@@ -62,9 +89,34 @@ async function PokemonDescription({ params }) {
             </div>
           </div>
         </div>
+        <div className="mt-10 w-full">
+          <h2 className="text-2xl text-center font-bold uppercase mb-4">
+            Evoluciones
+          </h2>
+          <div className="grid grid-cols-3 gap-3 p-3">
+            {evolutionsWithSprites.map((pokemon) => (
+              <PokemonsCard
+                pokemon={pokemon}
+                key={`${pokemon.name}-${pokemon.id}`}
+              />
+            ))}
+          </div>
+        </div>
       </div>
       <hr />
-      <Suspense fallback={<div>Loading Pokemons...</div>}>
+      <Suspense
+        fallback={
+          <div className="flex items-center justify-center my-5">
+            <img
+              src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/25.gif"
+              alt="Pikachu corriendo"
+            />
+            <p className="text-2xl text-amber-50 ml-4">
+              Cargando Other Pokemons...
+            </p>
+          </div>
+        }
+      >
         <Pokemons />
       </Suspense>
     </>

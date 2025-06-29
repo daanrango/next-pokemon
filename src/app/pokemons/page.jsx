@@ -1,25 +1,32 @@
 import PokemonsCard from "../components/PokemonsCard";
 
 async function loadPokemons(count = 21) {
-  const randomsIds = new Set();
-  while (randomsIds.size < count) {
-    const randomId = Math.floor(Math.random() * 1008) + 1;
-    randomsIds.add(randomId);
+  const response = await fetch(
+    `https://pokeapi.co/api/v2/pokemon?limit=${count}`
+  );
+  if (!response.ok) {
+    throw new Error(`Error fetching pokemons`);
   }
-  const detailsData = await Promise.all(
-    Array.from(randomsIds).map(async (id) => {
-      const response = await fetch(`https://pokeapi.co/api/v2/pokemon/${id}`);
-      if (!response.ok) {
-        throw new Error(`Error fetching Pokemon with id ${id}`);
+  const data = await response.json();
+
+  const detailedPokemons = await Promise.all(
+    data.results.map(async (pokemon) => {
+      const res = await fetch(pokemon.url);
+      const pokeData = await res.json();
+      const speciesRes = await fetch(pokeData.species.url);
+      const speciesData = await speciesRes.json();
+      if (speciesData.evolves_from_species === null) {
+        return pokeData;
       }
-      return await response.json();
+      return null;
     })
   );
-  return detailsData;
+
+  return detailedPokemons.filter(Boolean);
 }
 
 async function Pokemons() {
-  const listPokemons = await loadPokemons();
+  const listPokemons = await loadPokemons(120);
   return (
     <div className="grid grid-cols-3 gap-5 p-5">
       {listPokemons.map((pokemon) => (
