@@ -2,6 +2,16 @@ import { Suspense } from "react";
 import Pokemons from "../page";
 import PokemonsCard from "@/app/components/PokemonsCard";
 
+export async function generateStaticParams() {
+  const limit = 151;
+  const res = await fetch(`https://pokeapi.co/api/v2/pokemon?limit=${limit}`);
+  const data = await res.json();
+
+  return data.results.map((p) => ({ slug: p.name }));
+}
+
+export const dynamicParams = false;
+
 async function getDetailsPokemon(slug) {
   const rest = await fetch(`https://pokeapi.co/api/v2/pokemon/${slug}`);
   const data = await rest.json();
