@@ -4,10 +4,7 @@ import PokemonsCard from "@/app/components/PokemonsCard";
 
 export async function generateStaticParams() {
   const limit = 50;
-  const res = await fetch(`https://pokeapi.co/api/v2/pokemon?limit=${limit}`);
-  const data = await res.json();
-
-  return data.results.map((p) => ({ slug: p.name }));
+  return Array.from({ length: limit }, (_, i) => ({ slug: String(i + 1) }));
 }
 
 export const dynamicParams = false;
