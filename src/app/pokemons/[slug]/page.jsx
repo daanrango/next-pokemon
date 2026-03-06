@@ -3,7 +3,7 @@ import Pokemons from "../page";
 import PokemonsCard from "@/app/components/PokemonsCard";
 
 export async function generateStaticParams() {
-  const limit = 151;
+  const limit = 50;
   const res = await fetch(`https://pokeapi.co/api/v2/pokemon?limit=${limit}`);
   const data = await res.json();
 
@@ -13,23 +13,40 @@ export async function generateStaticParams() {
 export const dynamicParams = false;
 
 async function getDetailsPokemon(slug) {
-  const rest = await fetch(`https://pokeapi.co/api/v2/pokemon/${slug}`);
-  const data = await rest.json();
-  return data;
+  try {
+    const rest = await fetch(`https://pokeapi.co/api/v2/pokemon/${slug}`);
+    if (!rest.ok) return null;
+    return await rest.json();
+  } catch (e) {
+    return null;
+  }
 }
 
 async function getEvolutionChain(speciesUrl) {
-  const speciesRes = await fetch(speciesUrl);
-  const speciesData = await speciesRes.json();
-  const evolutionRes = await fetch(speciesData.evolution_chain.url);
-  return evolutionRes.json();
+  try {
+    const speciesRes = await fetch(speciesUrl);
+    if (!speciesRes.ok) return null;
+
+    const speciesData = await speciesRes.json();
+
+    const evolutionRes = await fetch(speciesData.evolution_chain.url);
+    if (!evolutionRes.ok) return null;
+
+    return await evolutionRes.json();
+  } catch (e) {
+    return null;
+  }
 }
 
 function getEvolutionNames(chain, evolutions = []) {
+  if (!chain?.species?.name) return evolutions;
+
   evolutions.push(chain.species.name);
-  if (chain.evolves_to.length > 0) {
+
+  if (chain.evolves_to?.length > 0) {
     chain.evolves_to.forEach((evo) => getEvolutionNames(evo, evolutions));
   }
+
   return evolutions;
 }
 
@@ -37,26 +54,38 @@ async function PokemonDescription({ params }) {
   const slug = params.slug;
   const pokemon = await getDetailsPokemon(slug);
 
-  const evolutionData = await getEvolutionChain(pokemon.species.url);
-  const evolutionNames = getEvolutionNames(evolutionData.chain);
+  if (!pokemon) {
+    return (
+      <div className="w-9/12 mx-auto my-10">
+        <h1 className="text-3xl font-bold uppercase">No disponible</h1>
+        <p>No se pudo cargar este Pokémon.</p>
+      </div>
+    );
+  }
 
-  const evolutionsWithSprites = await Promise.all(
-    evolutionNames.map(async (name) => {
-      const evoPokemon = await getDetailsPokemon(name);
-      return evoPokemon;
-    })
-  );
+  const evolutionData = await getEvolutionChain(pokemon.species.url);
+  const evolutionNames = evolutionData?.chain
+    ? getEvolutionNames(evolutionData.chain)
+    : [];
+
+  const evolutionsWithSprites = (
+    await Promise.all(
+      evolutionNames.map(async (name) => await getDetailsPokemon(name))
+    )
+  ).filter(Boolean);
 
   return (
     <>
       <div className="w-9/12 mx-auto my-10 flex flex-col items-center">
         <h1 className="text-4xl uppercase">{pokemon.name}</h1>
+
         <div className="flex w-full justify-center">
           <img
             className="w-5/12"
             src={pokemon.sprites.other["official-artwork"].front_default}
             alt={pokemon.name}
           />
+
           <div className="flex flex-col justify-between">
             <div>
               <h2 className="text-xl font-semibold uppercase">Tipo(s):</h2>
@@ -66,6 +95,7 @@ async function PokemonDescription({ params }) {
                 ))}
               </ul>
             </div>
+
             <div>
               <h2 className="text-xl font-semibold uppercase">Habilidades:</h2>
               <ul className="list-disc list-inside">
@@ -77,6 +107,7 @@ async function PokemonDescription({ params }) {
                 ))}
               </ul>
             </div>
+
             <div>
               <h2 className="text-xl font-semibold uppercase">Estadísticas:</h2>
               <ul className="list-disc list-inside">
@@ -88,6 +119,7 @@ async function PokemonDescription({ params }) {
                 ))}
               </ul>
             </div>
+
             <div>
               <h2 className="text-xl font-semibold uppercase">
                 Caracterisiticas:
@@ -99,21 +131,22 @@ async function PokemonDescription({ params }) {
             </div>
           </div>
         </div>
+
         <div className="mt-10 w-full">
           <h2 className="text-2xl text-center font-bold uppercase mb-4">
             Evoluciones
           </h2>
+
           <div className="grid grid-cols-3 gap-3 p-3">
-            {evolutionsWithSprites.map((pokemon) => (
-              <PokemonsCard
-                pokemon={pokemon}
-                key={`${pokemon.name}-${pokemon.id}`}
-              />
+            {evolutionsWithSprites.map((p) => (
+              <PokemonsCard pokemon={p} key={`${p.name}-${p.id}`} />
             ))}
           </div>
         </div>
       </div>
+
       <hr />
+
       <Suspense
         fallback={
           <div className="flex items-center justify-center my-5">
